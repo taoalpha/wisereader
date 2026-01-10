@@ -57,11 +57,11 @@ Simply run the binary to start browsing your inbox:
 
 WiseReader also supports direct command-line interactions:
 
-- **Read next article**:
+- **Read next article (or specific ID)**:
   ```bash
-  ./wisereader -r
+  ./wisereader -r [id]
   ```
-  Prints the content of the first available article, marks it as seen, and outputs its URL and ID.
+  Prints the content of the first available article (or the one with the given ID), marks it as seen, and outputs its URL and ID.
 
 - **Delete by ID (shortcut)**:
   ```bash

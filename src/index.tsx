@@ -620,7 +620,7 @@ Usage:
 Commands:
   (none)         Start interactive TUI inbox browser
   config         Prompt for and save Readwise Access Token
-  -r             Read next unseen article, mark as seen, and print ID
+  -r [id]        Read next unseen article (or specific id), mark as seen, and print ID
   -m <action> <id> Move or delete article by ID
                  Actions: archive, later, delete
   -d <id>        Quick alias for -m delete <id>
@@ -647,15 +647,28 @@ Commands:
     }
 
     if (args.includes('-r')) {
+        const rIndex = args.indexOf('-r');
+        const idArg = args[rIndex + 1];
+        // If idArg starts with -, it's another flag, so no id provided
+        const targetId = (idArg && !idArg.startsWith('-')) ? idArg : null;
+
         try {
-            const docs = await fetchDocuments('new', 1);
-            const docSummary = docs[0];
-            if (!docSummary) {
-                console.error(`No new articles found.`);
-                process.exit(1);
+            let docId = targetId;
+            if (!targetId) {
+                const docs = await fetchDocuments('new', 1);
+                const docSummary = docs[0];
+                if (!docSummary) {
+                    console.error(`No new articles found.`);
+                    process.exit(1);
+                }
+                docId = docSummary.id;
             }
             
-            const doc = await fetchDocumentContent(docSummary.id);
+            const doc = await fetchDocumentContent(docId!);
+            if (!doc) {
+                console.error(`Article not found: ${docId}`);
+                process.exit(1);
+            }
             const content = renderMarkdown(doc.html_content || 'No content', process.stdout.columns);
             console.log(content);
             
