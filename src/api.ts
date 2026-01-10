@@ -32,9 +32,9 @@ export interface Document {
   updated_at: string;
 }
 
-export const fetchDocuments = async (location: string = 'new'): Promise<Document[]> => {
+export const fetchDocuments = async (location: string = 'new', pageSize?: number): Promise<Document[]> => {
   const response = await client.get('/list/', {
-    params: { location },
+    params: { location, page_size: pageSize },
   });
   return response.data.results;
 };

@@ -8,6 +8,7 @@ import open from 'open';
 import { Markdown } from './components/Markdown.js';
 import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, deleteDocument, Document, saveToken } from './api.js';
 import { log } from './debug.js';
+import { renderMarkdown } from './utils.js';
 
 const Indicator = ({ isSelected }: { isSelected?: boolean }) => (
     <Box marginRight={1}>
@@ -606,9 +607,112 @@ const Config = () => {
     );
 };
 
-const Main = () => {
-    const isConfig = process.argv.includes('config');
-    return isConfig ? <Config /> : <App />;
+const handleCLI = async () => {
+    const args = process.argv.slice(2);
+    
+    if (args.includes('-h') || args.includes('--help')) {
+        console.log(`
+WiseReader - minimalist, Vim-inspired CLI client for Readwise Reader.
+
+Usage:
+  wisereader [command]
+
+Commands:
+  (none)         Start interactive TUI inbox browser
+  config         Prompt for and save Readwise Access Token
+  -r             Read next unseen article, mark as seen, and print ID
+  -m <action> <id> Move or delete article by ID
+                 Actions: archive, later, delete
+  -h, --help     Show this help
+
+TUI Navigation:
+  List View:
+    j/k          Navigate up/down
+    g/G          Jump to top/bottom
+    Enter        Open article
+    r            Refresh inbox
+    q            Quit
+  Reader View:
+    j/k          Scroll down/up (centered)
+    h/l          Scroll left/right
+    w/b          Jump forward/backward by word
+    g/G          Jump to top/bottom
+    M            Open Move menu (a: archive, l: later, d: delete)
+    O            Open link in browser
+    Esc          Back to list
+    q            Quit
+        `);
+        process.exit(0);
+    }
+
+    if (args.includes('-r')) {
+        try {
+            const docs = await fetchDocuments('new', 1);
+            const docSummary = docs[0];
+            if (!docSummary) {
+                console.error(`No new articles found.`);
+                process.exit(1);
+            }
+            
+            const doc = await fetchDocumentContent(docSummary.id);
+            const content = renderMarkdown(doc.html_content || 'No content', process.stdout.columns);
+            console.log(content);
+            
+            // Mark as seen
+            await updateDocumentLocation(doc.id, 'feed');
+            
+            console.log(`\nID: ${doc.id}`);
+            process.exit(0);
+        } catch (e: any) {
+            console.error(`Error: ${e.message}`);
+            process.exit(1);
+        }
+    }
+    
+    if (args.includes('-m')) {
+        const mIndex = args.indexOf('-m');
+        const action = args[mIndex + 1];
+        const id = args[mIndex + 2];
+        
+        if (!action || !id) {
+            console.error('Usage: wisereader -m <later|archive|delete> <id>');
+            process.exit(1);
+        }
+        
+        try {
+            if (action === 'later') {
+                await updateDocumentLocation(id, 'later');
+            } else if (action === 'archive') {
+                await updateDocumentLocation(id, 'archive');
+            } else if (action === 'delete') {
+                await deleteDocument(id);
+            } else {
+                console.error(`Unknown action: ${action}`);
+                process.exit(1);
+            }
+            console.log(`Action ${action} completed for ID: ${id}`);
+            process.exit(0);
+        } catch (e: any) {
+            console.error(`Error: ${e.message}`);
+            process.exit(1);
+        }
+    }
 };
 
-render(<Main />);
+const Main = () => {
+    return process.argv.includes('config') ? <Config /> : <App />;
+};
+
+const run = async () => {
+    const isCLI = process.argv.some(arg => ['-r', '-m', '-h', '--help'].includes(arg));
+    if (isCLI) {
+        await handleCLI();
+    } else {
+        render(<Main />);
+    }
+};
+
+run().catch(err => {
+    console.error(err);
+    process.exit(1);
+});

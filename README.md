@@ -53,6 +53,22 @@ Simply run the binary to start browsing your inbox:
 ./wisereader
 ```
 
+### CLI Commands
+
+WiseReader also supports direct command-line interactions:
+
+- **Read next article**:
+  ```bash
+  ./wisereader -r
+  ```
+  Prints the content of the first available article, marks it as seen, and outputs its ID.
+
+- **Move/Delete by ID**:
+  ```bash
+  ./wisereader -m <later|archive|delete> <id>
+  ```
+  Moves or deletes the article with the given ID.
+
 ## Build from Source
 
 Requirements: [pnpm](https://pnpm.io/) and Node.js.
