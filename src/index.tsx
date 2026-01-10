@@ -623,26 +623,27 @@ Commands:
   -r             Read next unseen article, mark as seen, and print ID
   -m <action> <id> Move or delete article by ID
                  Actions: archive, later, delete
+  -d <id>        Quick alias for -m delete <id>
   -h, --help     Show this help
-
-TUI Navigation:
-  List View:
-    j/k          Navigate up/down
-    g/G          Jump to top/bottom
-    Enter        Open article
-    r            Refresh inbox
-    q            Quit
-  Reader View:
-    j/k          Scroll down/up (centered)
-    h/l          Scroll left/right
-    w/b          Jump forward/backward by word
-    g/G          Jump to top/bottom
-    M            Open Move menu (a: archive, l: later, d: delete)
-    O            Open link in browser
-    Esc          Back to list
-    q            Quit
         `);
         process.exit(0);
+    }
+
+    if (args.includes('-d')) {
+        const dIndex = args.indexOf('-d');
+        const id = args[dIndex + 1];
+        if (!id) {
+            console.error('Usage: wisereader -d <id>');
+            process.exit(1);
+        }
+        try {
+            await deleteDocument(id);
+            console.log(`Deleted article with ID: ${id}`);
+            process.exit(0);
+        } catch (e: any) {
+            console.error(`Error: ${e.message}`);
+            process.exit(1);
+        }
     }
 
     if (args.includes('-r')) {
@@ -661,7 +662,8 @@ TUI Navigation:
             // Mark as seen
             await updateDocumentLocation(doc.id, 'feed');
             
-            console.log(`\nID: ${doc.id}`);
+            console.log(`\nURL: ${doc.source_url}`);
+            console.log(`ID: ${doc.id}`);
             process.exit(0);
         } catch (e: any) {
             console.error(`Error: ${e.message}`);
@@ -704,7 +706,7 @@ const Main = () => {
 };
 
 const run = async () => {
-    const isCLI = process.argv.some(arg => ['-r', '-m', '-h', '--help'].includes(arg));
+    const isCLI = process.argv.some(arg => ['-r', '-m', '-d', '-h', '--help'].includes(arg));
     if (isCLI) {
         await handleCLI();
     } else {

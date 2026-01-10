@@ -61,7 +61,13 @@ WiseReader also supports direct command-line interactions:
   ```bash
   ./wisereader -r
   ```
-  Prints the content of the first available article, marks it as seen, and outputs its ID.
+  Prints the content of the first available article, marks it as seen, and outputs its URL and ID.
+
+- **Delete by ID (shortcut)**:
+  ```bash
+  ./wisereader -d <id>
+  ```
+  Quickly delete an article by its ID.
 
 - **Move/Delete by ID**:
   ```bash
