@@ -4,6 +4,7 @@ import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
 import stripAnsi from 'strip-ansi';
+import open from 'open';
 import { Markdown } from './components/Markdown.js';
 import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, deleteDocument, Document, saveToken } from './api.js';
 import { log } from './debug.js';
@@ -22,7 +23,7 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
-  const [view, setView] = useState<'list' | 'reader' | 'menu'>('list');
+  const [view, setView] = useState<'list' | 'reader' | 'menu' | 'open-menu'>('list');
   const [error, setError] = useState<string | null>(null);
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -34,6 +35,7 @@ const App = () => {
   const [cursorCol, setCursorCol] = useState(0);
   const [parsedLines, setParsedLines] = useState<string[]>([]);
   const [jumpBuffer, setJumpBuffer] = useState('');
+  const [detectedLinks, setDetectedLinks] = useState<string[]>([]);
 
   const totalLines = parsedLines.length;
 
@@ -339,9 +341,34 @@ const App = () => {
         if (input === 'M') {
             setView('menu');
         }
+
+        if (input === 'O') {
+            if (selectedDoc) {
+                const line = parsedLines[cursorLine] ? stripAnsi(parsedLines[cursorLine]) : '';
+                // Simple URL regex
+                const urlRegex = /https?:\/\/[^\s)]+/g;
+                let match;
+                const links: string[] = [];
+                while ((match = urlRegex.exec(line)) !== null) {
+                    const start = match.index;
+                    const end = start + match[0].length;
+                    // Check if cursor is on or near the link (allowing 1 char buffer for terminal feel)
+                    if (cursorCol >= start && cursorCol <= end) {
+                        links.push(match[0]);
+                    }
+                }
+
+                if (links.length > 0) {
+                    setDetectedLinks(links);
+                    setView('open-menu');
+                } else {
+                    open(selectedDoc.source_url);
+                }
+            }
+        }
     }
     
-    if (view === 'menu') {
+    if (view === 'menu' || view === 'open-menu') {
         if (input === 'q' || key.escape) {
             setView('reader');
         }
@@ -393,6 +420,11 @@ const App = () => {
       }
   };
 
+  const handleOpenMenuSelect = async (item: { value: string }) => {
+      await open(item.value);
+      setView('reader');
+  };
+
   if (error) {
     return (
       <Box flexDirection="column" padding={1}>
@@ -438,7 +470,7 @@ const App = () => {
                     {selectedDoc.html_content || 'No content available.'}
                 </Markdown>
                 <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1} flexShrink={0} flexDirection="row" justifyContent="space-between">
-                    <Text color="gray"> [a] Archive | [M] Menu | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
+                    <Text color="gray"> [a] Archive | [M] Menu | [O] Open | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
                     <Text color="cyan"> Ln {cursorLine + 1}/{totalLines} ({percent}%) Col {cursorCol + 1} </Text>
                 </Box>
             </Box>
@@ -460,6 +492,25 @@ const App = () => {
                 <Text bold backgroundColor="cyan" color="white"> Actions for "{selectedDoc?.title}" </Text>
             </Box>
             <SelectInput items={menuItems} onSelect={handleMenuSelect} indicatorComponent={Indicator} itemComponent={Item} />
+            <Box marginTop={1}>
+                <Text color="gray"> [q/Esc] Cancel </Text>
+            </Box>
+        </Box>
+      );
+  }
+
+  if (view === 'open-menu') {
+      const menuItems = [
+          { label: `Source: ${selectedDoc?.source_url}`, value: selectedDoc?.source_url || '' },
+          ...detectedLinks.map(link => ({ label: `Link: ${link}`, value: link }))
+      ];
+
+      return (
+        <Box flexDirection="column" padding={1} height={termHeight}>
+            <Box marginBottom={1}>
+                <Text bold backgroundColor="cyan" color="white"> Open Link </Text>
+            </Box>
+            <SelectInput items={menuItems} onSelect={handleOpenMenuSelect} indicatorComponent={Indicator} itemComponent={Item} />
             <Box marginTop={1}>
                 <Text color="gray"> [q/Esc] Cancel </Text>
             </Box>
