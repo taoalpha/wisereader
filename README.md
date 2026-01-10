@@ -15,13 +15,12 @@ A minimalist, Vim-inspired CLI client for Readwise Reader.
     - `j` / `k`: Move down/up (centered scrolling).
     - `h` / `l`: Move left/right.
     - `w` / `b`: Jump forward/backward by word.
-    - `G`: Jump to bottom.
-    - `M`: Move item (Archive, Later, Delete).
+    - `g` / `G`: Jump to top/bottom.
+    - `M`: Move article (Archive, Later, Delete).
       - `a`: Archive
       - `l`: Later
       - `d`: Delete
-    - `O`: Open link in browser (prompts if multiple links at cursor).
-    - `+` / `-`: Zoom in/out (adjust content width).
+    - `O`: Open link (prompts if multiple links at cursor).
     - `Esc`: Back to list.
 - **Action Menu**: Press `M` to move items to Later, Archive, or Delete them.
 - **Auto-Cleanup**: Opening an item automatically marks it as seen (moves it to your Feed).

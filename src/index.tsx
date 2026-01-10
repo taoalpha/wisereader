@@ -37,7 +37,6 @@ const App = () => {
   const [jumpBuffer, setJumpBuffer] = useState('');
   const [detectedLinks, setDetectedLinks] = useState<{ label: string, url: string }[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [widthOffset, setWidthOffset] = useState(0);
 
   const totalLines = parsedLines.length;
 
@@ -362,13 +361,6 @@ const App = () => {
                 }
             }
         }
-
-        if (input === '+' || input === '=') {
-            setWidthOffset(prev => prev - 4);
-        }
-        if (input === '-') {
-            setWidthOffset(prev => prev + 4);
-        }
     }
     
     if (view === 'menu' || view === 'open-menu') {
@@ -478,7 +470,7 @@ const App = () => {
 
   if (view === 'reader' && selectedDoc) {
     const readerBodyHeight = Math.max(5, termHeight - 12); // Adjust for header/footer
-    const readerBodyWidth = Math.max(10, termWidth - 4 + widthOffset);
+    const readerBodyWidth = Math.max(10, termWidth - 4);
     const totalLines = parsedLines.length;
     
     log(`Render Reader: cursor=${cursorLine}, scroll=${scrollTop}, total=${totalLines}, height=${readerBodyHeight}, bodyWidth=${readerBodyWidth}`);
@@ -501,7 +493,7 @@ const App = () => {
                     {selectedDoc.html_content || 'No content available.'}
                 </Markdown>
                 <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1} flexShrink={0} flexDirection="row" justifyContent="space-between">
-                    <Text color="gray"> [M] Move | [O] Open | [+/-] Zoom | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
+                    <Text color="gray"> [M] Move article | [O] Open link | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
                     <Text color="cyan"> Ln {cursorLine + 1}/{totalLines} ({percent}%) Col {cursorCol + 1} </Text>
                 </Box>
             </Box>
@@ -523,8 +515,8 @@ const App = () => {
                 <Text bold backgroundColor="cyan" color="white"> Actions for "{selectedDoc?.title}" </Text>
             </Box>
             <SelectInput items={menuItems} onSelect={handleMenuSelect} indicatorComponent={Indicator} itemComponent={Item} />
-            <Box marginTop={1}>
-                <Text color="gray"> [q/Esc] Cancel </Text>
+            <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1}>
+                <Text color="gray"> [a] Archive | [l] Later | [d] Delete | [q/Esc] Cancel </Text>
             </Box>
         </Box>
       );
