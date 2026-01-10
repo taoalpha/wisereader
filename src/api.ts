@@ -2,13 +2,18 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Conf from 'conf';
 
-const __filename = fileURLToPath(import.meta.url);
+const __filename = fileURLToPath(import.meta.url || `file://${process.cwd()}/index.js`);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
+// Also try current working directory for portable binary use
+dotenv.config({ path: path.join(process.cwd(), '.env') });
 
-const TOKEN = process.env.READWISE_TOKEN;
+const config = new Conf({ projectName: 'wisereader' });
+
+const TOKEN = process.env.READWISE_TOKEN || config.get('token') as string;
 const BASE_URL = 'https://readwise.io/api/v3';
 
 const client = axios.create({
@@ -17,6 +22,10 @@ const client = axios.create({
     Authorization: `Token ${TOKEN}`,
   },
 });
+
+export const saveToken = (token: string) => {
+    config.set('token', token);
+};
 
 export interface Document {
   id: string;

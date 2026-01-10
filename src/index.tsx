@@ -1,11 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { render, Text, Box, useInput, useApp, useStdout } from 'ink';
 import SelectInput from 'ink-select-input';
+import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
 import stripAnsi from 'strip-ansi';
 import { Markdown } from './components/Markdown.js';
-import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, deleteDocument, Document } from './api.js';
+import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, deleteDocument, Document, saveToken } from './api.js';
 import { log } from './debug.js';
+
+const Indicator = ({ isSelected }: { isSelected?: boolean }) => (
+    <Box marginRight={1}>
+        <Text color="cyan">{isSelected ? '❯' : ' '}</Text>
+    </Box>
+);
+
+const Item = ({ isSelected, label }: { isSelected?: boolean; label: string }) => (
+    <Text color={isSelected ? 'cyan' : undefined}>{label}</Text>
+);
 
 const App = () => {
   const [loading, setLoading] = useState(true);
@@ -428,7 +439,7 @@ const App = () => {
                 </Markdown>
                 <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1} flexShrink={0} flexDirection="row" justifyContent="space-between">
                     <Text color="gray"> [a] Archive | [M] Menu | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
-                    <Text color="blue"> Ln {cursorLine + 1}/{totalLines} ({percent}%) Col {cursorCol + 1} </Text>
+                    <Text color="cyan"> Ln {cursorLine + 1}/{totalLines} ({percent}%) Col {cursorCol + 1} </Text>
                 </Box>
             </Box>
         )}
@@ -448,7 +459,7 @@ const App = () => {
             <Box marginBottom={1}>
                 <Text bold backgroundColor="cyan" color="white"> Actions for "{selectedDoc?.title}" </Text>
             </Box>
-            <SelectInput items={menuItems} onSelect={handleMenuSelect} />
+            <SelectInput items={menuItems} onSelect={handleMenuSelect} indicatorComponent={Indicator} itemComponent={Item} />
             <Box marginTop={1}>
                 <Text color="gray"> [q/Esc] Cancel </Text>
             </Box>
@@ -470,14 +481,14 @@ const App = () => {
   return (
     <Box flexDirection="column" padding={1} height={termHeight}>
       <Box marginBottom={1}>
-        <Text bold backgroundColor="blue" color="white"> WiseReader Inbox </Text>
+        <Text bold backgroundColor="cyan" color="white"> WiseReader Inbox </Text>
         <Text color="gray"> ({documents.length} items) </Text>
       </Box>
       
       {items.length === 0 ? (
           <Text italic color="gray">Your inbox is empty!</Text>
       ) : (
-          <SelectInput items={items} onSelect={handleSelect} limit={listHeight} />
+          <SelectInput items={items} onSelect={handleSelect} limit={listHeight} indicatorComponent={Indicator} itemComponent={Item} />
       )}
 
       <Box marginTop={1}>
@@ -487,4 +498,31 @@ const App = () => {
   );
 };
 
-render(<App />);
+const Config = () => {
+    const [token, setToken] = useState('');
+    const { exit } = useApp();
+
+    const handleSubmit = (val: string) => {
+        saveToken(val);
+        exit();
+    };
+
+    return (
+        <Box flexDirection="column" padding={1}>
+            <Text bold color="cyan">WiseReader Configuration</Text>
+            <Box marginTop={1}>
+                <Text>Enter your Readwise Access Token: </Text>
+                <TextInput value={token} onChange={setToken} onSubmit={handleSubmit} />
+            </Box>
+            <Text color="gray" marginTop={1}>Find your token at: https://readwise.io/access_token</Text>
+            <Text color="gray">Press Enter to save and exit</Text>
+        </Box>
+    );
+};
+
+const Main = () => {
+    const isConfig = process.argv.includes('config');
+    return isConfig ? <Config /> : <App />;
+};
+
+render(<Main />);
