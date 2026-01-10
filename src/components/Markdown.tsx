@@ -9,9 +9,16 @@ import chalk from 'chalk';
 import { log } from '../debug.js';
 
 // Configure marked with the terminal renderer
-marked.setOptions({
-  renderer: new TerminalRenderer() as any
-});
+const renderer = new TerminalRenderer() as any;
+const originalLink = renderer.link.bind(renderer);
+
+renderer.link = (token: any) => {
+    // Return a format that is easy to regex but still looks okay
+    // We use blue for the link to keep the TUI feel
+    return chalk.blue(`[${token.text}](${token.href})`);
+};
+
+marked.setOptions({ renderer });
 
 const turndownService = new TurndownService();
 

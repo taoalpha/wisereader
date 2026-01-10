@@ -35,8 +35,9 @@ const App = () => {
   const [cursorCol, setCursorCol] = useState(0);
   const [parsedLines, setParsedLines] = useState<string[]>([]);
   const [jumpBuffer, setJumpBuffer] = useState('');
-  const [detectedLinks, setDetectedLinks] = useState<string[]>([]);
+  const [detectedLinks, setDetectedLinks] = useState<{ label: string, url: string }[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [widthOffset, setWidthOffset] = useState(0);
 
   const totalLines = parsedLines.length;
 
@@ -337,16 +338,19 @@ const App = () => {
         if (input === 'O') {
             if (selectedDoc) {
                 const line = parsedLines[cursorLine] ? stripAnsi(parsedLines[cursorLine]) : '';
-                // Simple URL regex
-                const urlRegex = /https?:\/\/[^\s)]+/g;
+                // Regex for [text](url) or just url
+                const linkRegex = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)]+)/g;
                 let match;
-                const links: string[] = [];
-                while ((match = urlRegex.exec(line)) !== null) {
+                const links: { label: string, url: string }[] = [];
+                while ((match = linkRegex.exec(line)) !== null) {
                     const start = match.index;
                     const end = start + match[0].length;
-                    // Check if cursor is on or near the link (allowing 1 char buffer for terminal feel)
                     if (cursorCol >= start && cursorCol <= end) {
-                        links.push(match[0]);
+                        if (match[1] && match[2]) {
+                            links.push({ label: match[1], url: match[2] });
+                        } else if (match[3]) {
+                            links.push({ label: match[3], url: match[3] });
+                        }
                     }
                 }
 
@@ -358,11 +362,27 @@ const App = () => {
                 }
             }
         }
+
+        if (input === '+' || input === '=') {
+            setWidthOffset(prev => prev - 4);
+        }
+        if (input === '-') {
+            setWidthOffset(prev => prev + 4);
+        }
     }
     
     if (view === 'menu' || view === 'open-menu') {
         if (input === 'q' || key.escape) {
             setView('reader');
+        }
+        if (view === 'menu') {
+            if (input === 'a' || input === 'A') {
+                handleMenuSelect({ value: 'archive' });
+            } else if (input === 'd' || input === 'D') {
+                handleMenuSelect({ value: 'delete' });
+            } else if (input === 'l' || input === 'L') {
+                handleMenuSelect({ value: 'later' });
+            }
         }
     }
 
@@ -458,7 +478,7 @@ const App = () => {
 
   if (view === 'reader' && selectedDoc) {
     const readerBodyHeight = Math.max(5, termHeight - 12); // Adjust for header/footer
-    const readerBodyWidth = Math.max(10, termWidth - 4);
+    const readerBodyWidth = Math.max(10, termWidth - 4 + widthOffset);
     const totalLines = parsedLines.length;
     
     log(`Render Reader: cursor=${cursorLine}, scroll=${scrollTop}, total=${totalLines}, height=${readerBodyHeight}, bodyWidth=${readerBodyWidth}`);
@@ -481,7 +501,7 @@ const App = () => {
                     {selectedDoc.html_content || 'No content available.'}
                 </Markdown>
                 <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1} flexShrink={0} flexDirection="row" justifyContent="space-between">
-                    <Text color="gray"> [M] Move | [O] Open | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
+                    <Text color="gray"> [M] Move | [O] Open | [+/-] Zoom | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
                     <Text color="cyan"> Ln {cursorLine + 1}/{totalLines} ({percent}%) Col {cursorCol + 1} </Text>
                 </Box>
             </Box>
@@ -513,7 +533,7 @@ const App = () => {
   if (view === 'open-menu') {
       const menuItems = [
           { label: `Source: ${selectedDoc?.source_url}`, value: selectedDoc?.source_url || '' },
-          ...detectedLinks.map(link => ({ label: `Link: ${link}`, value: link }))
+          ...detectedLinks.map(link => ({ label: `Link: ${link.label} (${link.url})`, value: link.url }))
       ];
 
       return (
