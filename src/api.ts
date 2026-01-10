@@ -1,15 +1,8 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import Conf from 'conf';
 
-const __filename = fileURLToPath(import.meta.url || `file://${process.cwd()}/index.js`);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.join(__dirname, '../.env') });
-// Also try current working directory for portable binary use
-dotenv.config({ path: path.join(process.cwd(), '.env') });
+// Suppress Node.js warnings (like url.parse deprecation)
+process.env.NODE_NO_WARNINGS = '1';
 
 const config = new Conf({ projectName: 'wisereader' });
 

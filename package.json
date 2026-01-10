@@ -1,6 +1,6 @@
 {
   "name": "wisereader",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -17,7 +17,6 @@
     "axios": "^1.13.2",
     "chalk": "^5.6.2",
     "conf": "^15.0.2",
-    "dotenv": "^17.2.3",
     "env-paths": "^3.0.0",
     "ink": "^6.6.0",
     "ink-select-input": "^6.2.0",

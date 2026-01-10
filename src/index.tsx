@@ -36,6 +36,7 @@ const App = () => {
   const [parsedLines, setParsedLines] = useState<string[]>([]);
   const [jumpBuffer, setJumpBuffer] = useState('');
   const [detectedLinks, setDetectedLinks] = useState<string[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   const totalLines = parsedLines.length;
 
@@ -329,15 +330,6 @@ const App = () => {
              setJumpBuffer('');
         }
 
-        if (input === 'a' && selectedDoc) {
-            setLoading(true);
-            updateDocumentLocation(selectedDoc.id, 'archive').then(() => {
-                setView('list');
-                setSelectedDoc(null);
-                loadDocs();
-            });
-        }
-        
         if (input === 'M') {
             setView('menu');
         }
@@ -374,8 +366,27 @@ const App = () => {
         }
     }
 
-    if (view === 'list' && input === 'r') {
-      loadDocs();
+    if (view === 'list') {
+        if (input === 'r') {
+            loadDocs();
+        }
+        if (input === 'j' || key.downArrow) {
+            setSelectedIndex(prev => Math.min(prev + 1, documents.length - 1));
+        }
+        if (input === 'k' || key.upArrow) {
+            setSelectedIndex(prev => Math.max(0, prev - 1));
+        }
+        if (input === 'g') {
+            setSelectedIndex(0);
+        }
+        if (input === 'G') {
+            setSelectedIndex(Math.max(0, documents.length - 1));
+        }
+        if (key.return) {
+            if (documents[selectedIndex]) {
+                handleSelect({ value: documents[selectedIndex].id });
+            }
+        }
     }
   });
 
@@ -429,7 +440,7 @@ const App = () => {
     return (
       <Box flexDirection="column" padding={1}>
         <Text color="red">Error: {error}</Text>
-        <Text>Check your .env file and Readwise token.</Text>
+        <Text>Check your Readwise token or run './wisereader config' to set it.</Text>
         <Text color="gray">Press 'q' to quit</Text>
       </Box>
     );
@@ -470,7 +481,7 @@ const App = () => {
                     {selectedDoc.html_content || 'No content available.'}
                 </Markdown>
                 <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1} flexShrink={0} flexDirection="row" justifyContent="space-between">
-                    <Text color="gray"> [a] Archive | [M] Menu | [O] Open | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
+                    <Text color="gray"> [M] Move | [O] Open | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
                     <Text color="cyan"> Ln {cursorLine + 1}/{totalLines} ({percent}%) Col {cursorCol + 1} </Text>
                 </Box>
             </Box>
@@ -528,6 +539,7 @@ const App = () => {
   });
 
   const listHeight = Math.max(3, termHeight - 6);
+  const listScrollTop = Math.max(0, Math.min(selectedIndex - Math.floor(listHeight / 2), Math.max(0, items.length - listHeight)));
 
   return (
     <Box flexDirection="column" padding={1} height={termHeight}>
@@ -539,11 +551,22 @@ const App = () => {
       {items.length === 0 ? (
           <Text italic color="gray">Your inbox is empty!</Text>
       ) : (
-          <SelectInput items={items} onSelect={handleSelect} limit={listHeight} indicatorComponent={Indicator} itemComponent={Item} />
+          <Box flexDirection="column">
+              {items.slice(listScrollTop, listScrollTop + listHeight).map((item, index) => {
+                  const absoluteIndex = index + listScrollTop;
+                  const isSelected = absoluteIndex === selectedIndex;
+                  return (
+                      <Box key={item.value}>
+                          <Indicator isSelected={isSelected} />
+                          <Item isSelected={isSelected} label={item.label} />
+                      </Box>
+                  );
+              })}
+          </Box>
       )}
 
       <Box marginTop={1}>
-        <Text color="gray"> [r] Refresh | [q] Quit </Text>
+        <Text color="gray"> [r] Refresh | [j/k] Navigate | [Enter] Open | [q] Quit </Text>
       </Box>
     </Box>
   );

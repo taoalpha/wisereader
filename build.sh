@@ -33,6 +33,6 @@ pnpm exec caxa \
   --input "$STAGING" \
   --output dist/wisereader \
   --no-dedupe \
-  -- "{{caxa}}/node_modules/.bin/node" "{{caxa}}/bundle.js"
+  -- "{{caxa}}/node_modules/.bin/node" --no-warnings "{{caxa}}/bundle.js"
 
 echo "Build complete: dist/wisereader"
