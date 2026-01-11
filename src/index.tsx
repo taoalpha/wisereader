@@ -5,6 +5,7 @@ import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
 import stripAnsi from 'strip-ansi';
 import open from 'open';
+import clipboard from 'clipboardy';
 import { Markdown } from './components/Markdown.js';
 import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, deleteDocument, Document, saveToken } from './api.js';
 import { log } from './debug.js';
@@ -24,7 +25,7 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
-  const [view, setView] = useState<'list' | 'reader' | 'menu' | 'open-menu'>('list');
+  const [view, setView] = useState<'list' | 'reader' | 'menu' | 'open-menu' | 'copy-menu'>('list');
   const [error, setError] = useState<string | null>(null);
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -335,6 +336,10 @@ const App = () => {
             setView('menu');
         }
 
+        if (input === 'C') {
+            setView('copy-menu');
+        }
+
         if (input === 'O') {
             if (selectedDoc) {
                 const line = parsedLines[cursorLine] ? stripAnsi(parsedLines[cursorLine]) : '';
@@ -364,7 +369,7 @@ const App = () => {
         }
     }
     
-    if (view === 'menu' || view === 'open-menu') {
+    if (view === 'menu' || view === 'open-menu' || view === 'copy-menu') {
         if (input === 'q' || key.escape) {
             setView('reader');
         }
@@ -375,6 +380,13 @@ const App = () => {
                 handleMenuSelect({ value: 'delete' });
             } else if (input === 'l' || input === 'L') {
                 handleMenuSelect({ value: 'later' });
+            }
+        }
+        if (view === 'copy-menu') {
+            if (input === 'u' || input === 'U') {
+                handleCopyMenuSelect({ value: 'url' });
+            } else if (input === 'i' || input === 'I') {
+                handleCopyMenuSelect({ value: 'id' });
             }
         }
     }
@@ -449,6 +461,13 @@ const App = () => {
       setView('reader');
   };
 
+  const handleCopyMenuSelect = async (item: { value: string }) => {
+      if (!selectedDoc) return;
+      const text = item.value === 'url' ? selectedDoc.source_url : selectedDoc.id;
+      await clipboard.write(text);
+      setView('reader');
+  };
+
   if (error) {
     return (
       <Box flexDirection="column" padding={1}>
@@ -494,7 +513,7 @@ const App = () => {
                     {selectedDoc.html_content || 'No content available.'}
                 </Markdown>
                 <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1} flexShrink={0} flexDirection="row" justifyContent="space-between">
-                    <Text color="gray"> [M] Move article | [O] Open link | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
+                    <Text color="gray"> [M] Move article | [O] Open link | [C] Copy | [Esc] Back | [h/j/k/l/w/b] Move | [q] Quit </Text>
                     <Text color="cyan"> Ln {cursorLine + 1}/{totalLines} ({percent}%) Col {cursorCol + 1} </Text>
                 </Box>
             </Box>
@@ -518,6 +537,25 @@ const App = () => {
             <SelectInput items={menuItems} onSelect={handleMenuSelect} indicatorComponent={Indicator} itemComponent={Item} />
             <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1}>
                 <Text color="gray"> [a] Archive | [l] Later | [d] Delete | [q/Esc] Cancel </Text>
+            </Box>
+        </Box>
+      );
+  }
+
+  if (view === 'copy-menu') {
+      const menuItems = [
+          { label: 'Copy URL', value: 'url' },
+          { label: 'Copy ID', value: 'id' }
+      ];
+      
+      return (
+        <Box flexDirection="column" padding={1} height={termHeight}>
+            <Box marginBottom={1}>
+                <Text bold backgroundColor="cyan" color="white"> Copy to Clipboard </Text>
+            </Box>
+            <SelectInput items={menuItems} onSelect={handleCopyMenuSelect} indicatorComponent={Indicator} itemComponent={Item} />
+            <Box marginTop={1} borderStyle="single" borderColor="gray" paddingX={1}>
+                <Text color="gray"> [u] Copy URL | [i] Copy ID | [q/Esc] Cancel </Text>
             </Box>
         </Box>
       );

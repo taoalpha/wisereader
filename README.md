@@ -21,6 +21,9 @@ A minimalist, Vim-inspired CLI client for Readwise Reader.
       - `l`: Later
       - `d`: Delete
     - `O`: Open link (prompts if multiple links at cursor).
+    - `C`: Copy menu (Copy URL, Copy ID).
+      - `u`: Copy URL
+      - `i`: Copy ID
     - `Esc`: Back to list.
 - **Action Menu**: Press `M` to move items to Later, Archive, or Delete them.
 - **Auto-Cleanup**: Opening an item automatically marks it as seen (moves it to your Feed).
