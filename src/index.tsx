@@ -639,7 +639,9 @@ const Config = () => {
                 <Text>Enter your Readwise Access Token: </Text>
                 <TextInput value={token} onChange={setToken} onSubmit={handleSubmit} />
             </Box>
-            <Text color="gray" marginTop={1}>Find your token at: https://readwise.io/access_token</Text>
+            <Box marginTop={1}>
+                <Text color="gray">Find your token at: https://readwise.io/access_token</Text>
+            </Box>
             <Text color="gray">Press Enter to save and exit</Text>
         </Box>
     );
@@ -693,8 +695,8 @@ Commands:
         try {
             let docId = targetId;
             if (!targetId) {
-                const docs = await fetchDocuments('new', 1);
-                const docSummary = docs[0];
+                const docs = await fetchDocuments('new', 10);
+                const docSummary = docs[Math.floor(Math.random() * docs.length)];
                 if (!docSummary) {
                     console.error(`No new articles found.`);
                     process.exit(1);
