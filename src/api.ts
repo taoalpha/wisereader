@@ -53,3 +53,23 @@ export const updateDocumentLocation = async (id: string, location: 'archive' | '
 export const deleteDocument = async (id: string): Promise<void> => {
   await client.delete(`/delete/${id}/`);
 };
+
+export interface CreateDocumentOptions {
+  url: string;
+  location?: 'new' | 'later' | 'archive';
+  tags?: string[];
+}
+
+export interface CreateDocumentResponse {
+  id: string;
+  url: string;
+}
+
+export const createDocument = async (options: CreateDocumentOptions): Promise<CreateDocumentResponse> => {
+  const response = await client.post('/save/', {
+    url: options.url,
+    location: options.location,
+    tags: options.tags,
+  });
+  return response.data;
+};

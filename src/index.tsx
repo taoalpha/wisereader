@@ -7,7 +7,7 @@ import stripAnsi from 'strip-ansi';
 import open from 'open';
 import clipboard from 'clipboardy';
 import { Markdown } from './components/Markdown.js';
-import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, deleteDocument, Document, saveToken } from './api.js';
+import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, deleteDocument, createDocument, Document, saveToken } from './api.js';
 import { log } from './debug.js';
 import { renderMarkdown } from './utils.js';
 
@@ -660,6 +660,10 @@ Usage:
 Commands:
   (none)         Start interactive TUI inbox browser
   config         Prompt for and save Readwise Access Token
+  -a <url>       Add a new document by URL
+                 Options:
+                   -m <later|archive>  Set initial location (default: new)
+                   --tags=a,b,c        Add comma-separated tags
   -r [id]        Read next unseen article (or specific id), mark as seen, and print ID
   -m <action> <id> Move or delete article by ID
                  Actions: archive, later, delete
@@ -667,6 +671,53 @@ Commands:
   -h, --help     Show this help
         `);
         process.exit(0);
+    }
+
+    if (args.includes('-a')) {
+        const aIndex = args.indexOf('-a');
+        const url = args[aIndex + 1];
+        
+        if (!url || url.startsWith('-')) {
+            console.error('Usage: wisereader -a <url> [-m <later|archive>] [--tags=a,b,c]');
+            process.exit(1);
+        }
+
+        let location: 'new' | 'later' | 'archive' | undefined;
+        const mIndex = args.indexOf('-m');
+        if (mIndex !== -1 && mIndex > aIndex) {
+            const loc = args[mIndex + 1];
+            if (loc === 'later' || loc === 'archive') {
+                location = loc;
+            } else if (loc && !loc.startsWith('-')) {
+                console.error('Invalid location for -a. Use: later or archive');
+                process.exit(1);
+            }
+        }
+
+        let tags: string[] | undefined;
+        const tagsArg = args.find(arg => arg.startsWith('--tags='));
+        if (tagsArg) {
+            const tagsValue = tagsArg.slice('--tags='.length);
+            if (tagsValue) {
+                tags = tagsValue.split(',').map(t => t.trim()).filter(t => t.length > 0);
+            }
+        }
+
+        try {
+            const result = await createDocument({ url, location, tags });
+            console.log(`Added document: ${url}`);
+            console.log(`ID: ${result.id}`);
+            if (location) {
+                console.log(`Location: ${location}`);
+            }
+            if (tags && tags.length > 0) {
+                console.log(`Tags: ${tags.join(', ')}`);
+            }
+            process.exit(0);
+        } catch (e: any) {
+            console.error(`Error: ${e.message}`);
+            process.exit(1);
+        }
     }
 
     if (args.includes('-d')) {
@@ -759,7 +810,7 @@ const Main = () => {
 };
 
 const run = async () => {
-    const isCLI = process.argv.some(arg => ['-r', '-m', '-d', '-h', '--help'].includes(arg));
+    const isCLI = process.argv.some(arg => ['-r', '-m', '-d', '-a', '-h', '--help'].includes(arg));
     if (isCLI) {
         await handleCLI();
     } else {
