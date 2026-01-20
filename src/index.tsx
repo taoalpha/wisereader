@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { access, chmod, rename, writeFile, readFile } from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
+import path from 'node:path';
 import { render, Text, Box, useInput, useApp, useStdout } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
+import chalk from 'chalk';
 import stripAnsi from 'strip-ansi';
 import open from 'open';
 import clipboard from 'clipboardy';
@@ -651,8 +655,9 @@ const handleCLI = async () => {
     const args = process.argv.slice(2);
     
     if (args.includes('-h') || args.includes('--help')) {
+        const banner = `${chalk.cyan.bold('WiseReader')} ${chalk.gray(`v${await getAppVersion()}`)}`;
         console.log(`
-WiseReader - minimalist, Vim-inspired CLI client for Readwise Reader.
+${banner} - minimalist, Vim-inspired CLI client for Readwise Reader.
 
 Usage:
   wisereader [command]
@@ -820,11 +825,210 @@ Commands:
     }
 };
 
+const UPDATE_URL = 'https://api.github.com/repos/taoalpha/wisereader/releases/latest';
+const UPDATE_TIMEOUT_MS = 3000;
+let cachedVersion: string | null = null;
+
+type ReleaseAsset = {
+    name: string;
+    browser_download_url: string;
+};
+
+type ReleaseResponse = {
+    tag_name?: string;
+    assets?: ReleaseAsset[];
+};
+
+const readPackageVersion = async (): Promise<string | null> => {
+    const packagePath = path.resolve(process.cwd(), 'package.json');
+    try {
+        const contents = await readFile(packagePath, 'utf8');
+        const parsed = JSON.parse(contents) as { version?: string };
+        return parsed.version ?? null;
+    } catch {
+        return null;
+    }
+};
+
+const getAppVersion = async (): Promise<string> => {
+    if (cachedVersion) {
+        return cachedVersion;
+    }
+    const envVersion = process.env.WISEREADER_VERSION;
+    if (envVersion) {
+        cachedVersion = envVersion;
+        return envVersion;
+    }
+    const pkgVersion = await readPackageVersion();
+    cachedVersion = pkgVersion ?? '0.0.0';
+    return cachedVersion;
+};
+
+const parseVersion = (value: string): number[] | null => {
+    const normalized = value.trim().replace(/^v/, '');
+    if (!normalized) {
+        return null;
+    }
+    const parts = normalized.split('.');
+    if (parts.some(part => !/^[0-9]+$/.test(part))) {
+        return null;
+    }
+    return parts.map(Number);
+};
+
+const compareVersions = (left: number[], right: number[]): number => {
+    const length = Math.max(left.length, right.length);
+    for (let i = 0; i < length; i += 1) {
+        const leftValue = left[i] ?? 0;
+        const rightValue = right[i] ?? 0;
+        if (leftValue > rightValue) {
+            return 1;
+        }
+        if (leftValue < rightValue) {
+            return -1;
+        }
+    }
+    return 0;
+};
+
+const getAssetName = (): string | null => {
+    if (process.platform === 'darwin' && process.arch === 'arm64') {
+        return 'wisereader-darwin-arm64';
+    }
+    if (process.platform === 'darwin' && process.arch === 'x64') {
+        return 'wisereader-darwin-x64';
+    }
+    if (process.platform === 'linux' && process.arch === 'x64') {
+        return 'wisereader-linux-x64';
+    }
+    if (process.platform === 'linux' && process.arch === 'arm64') {
+        return 'wisereader-linux-arm64';
+    }
+    if (process.platform === 'win32' && process.arch === 'x64') {
+        return 'wisereader-windows-x64.exe';
+    }
+    if (process.platform === 'win32' && process.arch === 'arm64') {
+        return 'wisereader-windows-arm64.exe';
+    }
+    return null;
+};
+
+const getExecutablePath = (): string => {
+    return process.execPath || process.argv[0];
+};
+
+const isSelfUpdateSupported = (execPath: string): boolean => {
+    const name = path.basename(execPath);
+    return name === 'wisereader' || name === 'wisereader.exe' || name.startsWith('wisereader-');
+};
+
+const fetchLatestRelease = async (): Promise<ReleaseResponse | null> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), UPDATE_TIMEOUT_MS);
+    try {
+        const response = await fetch(UPDATE_URL, {
+            headers: {
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'wisereader',
+            },
+            signal: controller.signal,
+        });
+        if (!response.ok) {
+            return null;
+        }
+        return await response.json() as ReleaseResponse;
+    } catch (error) {
+        log(`update check failed: ${String(error)}`);
+        return null;
+    } finally {
+        clearTimeout(timeout);
+    }
+};
+
+const applyPendingUpdate = async (execPath: string): Promise<boolean> => {
+    const pendingPath = `${execPath}.new`;
+    try {
+        await access(pendingPath, fsConstants.F_OK);
+    } catch {
+        return false;
+    }
+
+    try {
+        await rename(pendingPath, execPath);
+        await chmod(execPath, 0o755);
+        log(`update applied from ${pendingPath}`);
+        return true;
+    } catch (error) {
+        log(`update apply failed: ${String(error)}`);
+        return false;
+    }
+};
+
+const checkForUpdate = async (execPath: string): Promise<void> => {
+    const latestRelease = await fetchLatestRelease();
+    if (!latestRelease?.tag_name) {
+        return;
+    }
+
+    const latestVersion = parseVersion(latestRelease.tag_name);
+    const currentVersion = parseVersion(await getAppVersion());
+    if (!latestVersion || !currentVersion) {
+        return;
+    }
+
+    if (compareVersions(latestVersion, currentVersion) <= 0) {
+        return;
+    }
+
+    const assetName = getAssetName();
+    if (!assetName) {
+        return;
+    }
+
+    const asset = latestRelease.assets?.find(item => item.name === assetName);
+    if (!asset?.browser_download_url) {
+        log(`update asset not found: ${assetName}`);
+        return;
+    }
+
+    try {
+        await access(execPath, fsConstants.W_OK);
+    } catch {
+        log('update skipped: executable not writable');
+        return;
+    }
+
+    const downloadPath = `${execPath}.download`;
+    const response = await fetch(asset.browser_download_url);
+    if (!response.ok) {
+        log(`update download failed: ${response.status}`);
+        return;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await writeFile(downloadPath, buffer);
+    await chmod(downloadPath, 0o755);
+
+    const targetPath = process.platform === 'win32' ? `${execPath}.new` : execPath;
+    await rename(downloadPath, targetPath);
+    if (process.platform === 'win32') {
+        log(`update downloaded to ${targetPath}`);
+        return;
+    }
+
+    log(`update applied to ${targetPath}`);
+};
+
 const Main = () => {
     return process.argv.includes('config') ? <Config /> : <App />;
 };
 
 const run = async () => {
+    const execPath = getExecutablePath();
+    if (isSelfUpdateSupported(execPath)) {
+        await applyPendingUpdate(execPath);
+        await checkForUpdate(execPath);
+    }
     const isCLI = process.argv.some(arg => ['-r', '-m', '-d', '-a', '-h', '--help'].includes(arg));
     if (isCLI) {
         await handleCLI();

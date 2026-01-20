@@ -1,4 +1,4 @@
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,6 +36,17 @@ const outfile = outfileEnv ?? path.join(distDir, `wisereader${isWindows ? '.exe'
 await rm(distDir, { recursive: true, force: true });
 await mkdir(distDir, { recursive: true });
 
+const packageJsonPath = path.join(root, 'package.json');
+let versionDefine = null;
+try {
+  const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'));
+  if (packageJson?.version) {
+    versionDefine = `--define:process.env.WISEREADER_VERSION="${packageJson.version}"`;
+  }
+} catch {
+  versionDefine = null;
+}
+
 const args = [
   'build',
   entry,
@@ -47,6 +58,7 @@ const args = [
   '--sourcemap=linked',
   '--minify',
   '--define:process.env.NODE_ENV="production"',
+  ...(versionDefine ? [versionDefine] : []),
 ];
 
 const processResult = Bun.spawn({
