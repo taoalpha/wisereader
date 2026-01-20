@@ -46,8 +46,24 @@ export const fetchDocumentContent = async (id: string): Promise<Document> => {
   return response.data.results[0];
 };
 
+export interface UpdateDocumentOptions {
+  location?: 'archive' | 'later' | 'feed' | 'new';
+  tags?: string[];
+}
+
+export const updateDocument = async (id: string, options: UpdateDocumentOptions): Promise<void> => {
+  const payload: Record<string, unknown> = {};
+  if (options.location) {
+    payload.location = options.location;
+  }
+  if (options.tags) {
+    payload.tags = options.tags;
+  }
+  await client.patch(`/update/${id}/`, payload);
+};
+
 export const updateDocumentLocation = async (id: string, location: 'archive' | 'later' | 'feed'): Promise<void> => {
-  await client.patch(`/update/${id}/`, { location });
+  await updateDocument(id, { location });
 };
 
 export const deleteDocument = async (id: string): Promise<void> => {

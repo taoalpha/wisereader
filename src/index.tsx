@@ -7,7 +7,7 @@ import stripAnsi from 'strip-ansi';
 import open from 'open';
 import clipboard from 'clipboardy';
 import { Markdown } from './components/Markdown.js';
-import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, deleteDocument, createDocument, Document, saveToken } from './api.js';
+import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, updateDocument, deleteDocument, createDocument, Document, saveToken } from './api.js';
 import { log } from './debug.js';
 import { renderMarkdown } from './utils.js';
 
@@ -667,6 +667,8 @@ Commands:
   -r [id]        Read next unseen article (or specific id), mark as seen, and print ID
   -m <action> <id> Move or delete article by ID
                  Actions: archive, later, delete
+                 Options:
+                   --tags=a,b,c        Add comma-separated tags (archive/later only)
   -d <id>        Quick alias for -m delete <id>
   -h, --help     Show this help
         `);
@@ -778,25 +780,38 @@ Commands:
     if (args.includes('-m')) {
         const mIndex = args.indexOf('-m');
         const action = args[mIndex + 1];
-        const id = args[mIndex + 2];
+        
+        const remainingArgs = args.slice(mIndex + 2).filter(arg => !arg.startsWith('--'));
+        const id = remainingArgs[0];
         
         if (!action || !id) {
-            console.error('Usage: wisereader -m <later|archive|delete> <id>');
+            console.error('Usage: wisereader -m <later|archive|delete> <id> [--tags=a,b,c]');
             process.exit(1);
+        }
+
+        let tags: string[] | undefined;
+        const tagsArg = args.find(arg => arg.startsWith('--tags='));
+        if (tagsArg) {
+            const tagsValue = tagsArg.slice('--tags='.length);
+            if (tagsValue) {
+                tags = tagsValue.split(',').map(t => t.trim()).filter(t => t.length > 0);
+            }
         }
         
         try {
-            if (action === 'later') {
-                await updateDocumentLocation(id, 'later');
-            } else if (action === 'archive') {
-                await updateDocumentLocation(id, 'archive');
-            } else if (action === 'delete') {
+            if (action === 'delete') {
                 await deleteDocument(id);
+            } else if (action === 'later' || action === 'archive') {
+                await updateDocument(id, { location: action, tags });
             } else {
                 console.error(`Unknown action: ${action}`);
                 process.exit(1);
             }
-            console.log(`Action ${action} completed for ID: ${id}`);
+            let message = `Action ${action} completed for ID: ${id}`;
+            if (tags && tags.length > 0) {
+                message += ` (tags: ${tags.join(', ')})`;
+            }
+            console.log(message);
             process.exit(0);
         } catch (e: any) {
             console.error(`Error: ${e.message}`);
