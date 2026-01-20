@@ -38,6 +38,12 @@ curl -L https://github.com/taoalpha/wisereader/releases/download/v0.0.1/wiseread
 ./wisereader config
 ```
 
+Install via script (macOS/Linux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/taoalpha/wisereader/master/scripts/install.sh | bash
+```
+
 ## Configuration
 
 Set your Readwise access token:

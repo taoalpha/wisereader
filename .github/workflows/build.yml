@@ -12,12 +12,15 @@ jobs:
         include:
           - os: macos-14
             target: bun-darwin-arm64
+            artifact: darwin-arm64
             outfile: dist/wisereader-darwin-arm64
           - os: ubuntu-latest
             target: bun-linux-x64
+            artifact: linux-x64
             outfile: dist/wisereader-linux-x64
           - os: windows-latest
             target: bun-windows-x64
+            artifact: windows-x64
             outfile: dist/wisereader-windows-x64.exe
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +33,13 @@ jobs:
         env:
           BUN_TARGET: ${{ matrix.target }}
           BUN_OUTFILE: ${{ matrix.outfile }}
+      - if: runner.os == 'Windows'
+        run: powershell -NoProfile -Command "Compress-Archive -Path '${{ matrix.outfile }}' -DestinationPath '${{ matrix.outfile }}.zip'"
+      - if: runner.os != 'Windows'
+        run: zip -j "${{ matrix.outfile }}.zip" "${{ matrix.outfile }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: wisereader-${{ matrix.target }}
-          path: ${{ matrix.outfile }}
+          name: wisereader-${{ matrix.artifact }}
+          path: |
+            ${{ matrix.outfile }}
+            ${{ matrix.outfile }}.zip
