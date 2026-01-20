@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { access, chmod, rename, writeFile, readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { constants as fsConstants } from 'node:fs';
+import { access, chmod, rename, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { render, Text, Box, useInput, useApp, useStdout } from 'ink';
 import SelectInput from 'ink-select-input';
 import TextInput from 'ink-text-input';
@@ -10,6 +13,7 @@ import chalk from 'chalk';
 import stripAnsi from 'strip-ansi';
 import open from 'open';
 import clipboard from 'clipboardy';
+import packageJson from '../package.json' with { type: 'json' };
 import { Markdown } from './components/Markdown.js';
 import { fetchDocuments, fetchDocumentContent, updateDocumentLocation, updateDocument, deleteDocument, createDocument, Document, saveToken } from './api.js';
 import { log } from './debug.js';
@@ -895,7 +899,9 @@ const handleCLI = async () => {
 
 const UPDATE_URL = 'https://api.github.com/repos/taoalpha/wisereader/releases/latest';
 const UPDATE_TIMEOUT_MS = 3000;
+const execFileAsync = promisify(execFile);
 let cachedVersion: string | null = null;
+const bundledVersion = typeof packageJson.version === 'string' ? packageJson.version : null;
 
 type ReleaseAsset = {
     name: string;
@@ -907,29 +913,16 @@ type ReleaseResponse = {
     assets?: ReleaseAsset[];
 };
 
-const readPackageVersion = async (): Promise<string | null> => {
-    const packagePath = path.resolve(process.cwd(), 'package.json');
-    try {
-        const contents = await readFile(packagePath, 'utf8');
-        const parsed = JSON.parse(contents) as { version?: string };
-        return parsed.version ?? null;
-    } catch {
-        return null;
-    }
-};
-
 const getAppVersion = async (): Promise<string> => {
     if (cachedVersion) {
         return cachedVersion;
     }
-    const envVersion = process.env.WISEREADER_VERSION;
-    if (envVersion) {
-        cachedVersion = envVersion;
-        return envVersion;
+    if (bundledVersion) {
+        cachedVersion = bundledVersion;
+        return bundledVersion;
     }
-    const pkgVersion = await readPackageVersion();
-    cachedVersion = pkgVersion ?? '0.0.0';
-    return cachedVersion;
+    console.error('WiseReader failed to read its bundled version. Please reinstall from https://github.com/taoalpha/wisereader/releases/latest');
+    process.exit(1);
 };
 
 const parseVersion = (value: string): number[] | null => {
@@ -961,24 +954,36 @@ const compareVersions = (left: number[], right: number[]): number => {
 
 const getAssetName = (): string | null => {
     if (process.platform === 'darwin' && process.arch === 'arm64') {
-        return 'wisereader-darwin-arm64';
+        return 'wisereader-darwin-arm64.zip';
     }
     if (process.platform === 'darwin' && process.arch === 'x64') {
-        return 'wisereader-darwin-x64';
+        return 'wisereader-darwin-x64.zip';
     }
     if (process.platform === 'linux' && process.arch === 'x64') {
-        return 'wisereader-linux-x64';
+        return 'wisereader-linux-x64.zip';
     }
     if (process.platform === 'linux' && process.arch === 'arm64') {
-        return 'wisereader-linux-arm64';
+        return 'wisereader-linux-arm64.zip';
     }
     if (process.platform === 'win32' && process.arch === 'x64') {
-        return 'wisereader-windows-x64.exe';
+        return 'wisereader-windows-x64.exe.zip';
     }
     if (process.platform === 'win32' && process.arch === 'arm64') {
-        return 'wisereader-windows-arm64.exe';
+        return 'wisereader-windows-arm64.exe.zip';
     }
     return null;
+};
+
+const unzipAsset = async (zipPath: string, assetName: string): Promise<string | null> => {
+    const entryName = assetName.replace(/\.zip$/, '');
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'wisereader-update-'));
+    try {
+        await execFileAsync('unzip', ['-o', zipPath, entryName, '-d', tempDir]);
+        return path.join(tempDir, entryName);
+    } catch (error) {
+        log(`update unzip failed: ${String(error)}`);
+        return null;
+    }
 };
 
 const getExecutablePath = (): string => {
@@ -1066,7 +1071,8 @@ const checkForUpdate = async (execPath: string): Promise<void> => {
         return;
     }
 
-    const downloadPath = `${execPath}.download`;
+    const isZipAsset = assetName.endsWith('.zip');
+    const downloadPath = `${execPath}.download${isZipAsset ? '.zip' : ''}`;
     const response = await fetch(asset.browser_download_url);
     if (!response.ok) {
         log(`update download failed: ${response.status}`);
@@ -1075,10 +1081,23 @@ const checkForUpdate = async (execPath: string): Promise<void> => {
 
     const buffer = Buffer.from(await response.arrayBuffer());
     await writeFile(downloadPath, buffer);
-    await chmod(downloadPath, 0o755);
+    if (!isZipAsset) {
+        await chmod(downloadPath, 0o755);
+    }
 
     const targetPath = process.platform === 'win32' ? `${execPath}.new` : execPath;
-    await rename(downloadPath, targetPath);
+    if (isZipAsset) {
+        const extractedPath = await unzipAsset(downloadPath, assetName);
+        if (!extractedPath) {
+            return;
+        }
+        await rename(extractedPath, targetPath);
+        await chmod(targetPath, 0o755);
+        await rm(path.dirname(extractedPath), { recursive: true, force: true });
+        await rm(downloadPath, { force: true });
+    } else {
+        await rename(downloadPath, targetPath);
+    }
     if (process.platform === 'win32') {
         log(`update downloaded to ${targetPath}`);
         return;
