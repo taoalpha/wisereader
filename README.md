@@ -80,11 +80,11 @@ WiseReader also supports direct command-line interactions:
 
 ## Build from Source
 
-Requirements: [pnpm](https://pnpm.io/) and Node.js.
+Requirements: [Bun](https://bun.sh/) and Node.js.
 
 ```bash
-pnpm install
-pnpm build
+bun install
+bun run build
 ```
 
 The executable will be generated in `dist/wisereader`.

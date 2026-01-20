@@ -5,9 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "./build.sh",
-    "start": "tsx src/index.tsx",
-    "dev": "tsx src/index.tsx"
+    "build": "bun run scripts/build.mjs",
+    "start": "bun run src/index.tsx",
+    "dev": "bun run src/index.tsx",
+    "typecheck": "bun x tsc --noEmit"
   },
   "keywords": [],
   "author": "",
@@ -40,12 +41,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^18.2.19",
     "@types/turndown": "^5.0.6",
-    "caxa": "^3.0.1",
-    "esbuild": "^0.27.2",
-    "pkg": "^5.8.1",
-    "postject": "1.0.0-alpha.6",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
+    "react-devtools-core": "^6.1.2",
     "typescript": "^5.9.3"
   }
 }
