@@ -651,12 +651,9 @@ const Config = () => {
     );
 };
 
-const handleCLI = async () => {
-    const args = process.argv.slice(2);
-    
-    if (args.includes('-h') || args.includes('--help')) {
-        const banner = `${chalk.cyan.bold('WiseReader')} ${chalk.gray(`v${await getAppVersion()}`)}`;
-        console.log(`
+const getHelpText = async (): Promise<string> => {
+    const banner = `${chalk.cyan.bold('WiseReader')} ${chalk.gray(`v${await getAppVersion()}`)}`;
+    return `
 ${banner} - minimalist, Vim-inspired CLI client for Readwise Reader.
 
 Usage:
@@ -676,7 +673,78 @@ Commands:
                    --tags=a,b,c        Add comma-separated tags (archive/later only)
   -d <id>        Quick alias for -m delete <id>
   -h, --help     Show this help
-        `);
+        `;
+};
+
+const isValidArgs = (args: string[]): boolean => {
+    if (args.length === 0) {
+        return true;
+    }
+    if (args[0] === 'config') {
+        return args.length === 1;
+    }
+
+    if (args.includes('-h') || args.includes('--help')) {
+        return true;
+    }
+
+    const hasAdd = args.includes('-a');
+    const hasMove = args.includes('-m');
+
+    for (let i = 0; i < args.length; i += 1) {
+        const arg = args[i];
+        if (arg === '-a') {
+            const url = args[i + 1];
+            if (!url || url.startsWith('-')) {
+                return false;
+            }
+            i += 1;
+            continue;
+        }
+        if (arg === '-m') {
+            const action = args[i + 1];
+            const id = args[i + 2];
+            if (!action || !id || action.startsWith('-') || id.startsWith('-')) {
+                return false;
+            }
+            i += 2;
+            continue;
+        }
+        if (arg === '-r') {
+            const id = args[i + 1];
+            if (id && !id.startsWith('-')) {
+                i += 1;
+            }
+            continue;
+        }
+        if (arg === '-d') {
+            const id = args[i + 1];
+            if (!id || id.startsWith('-')) {
+                return false;
+            }
+            i += 1;
+            continue;
+        }
+        if (arg.startsWith('--tags=')) {
+            if (!hasAdd && !hasMove) {
+                return false;
+            }
+            continue;
+        }
+        if (arg.startsWith('-')) {
+            return false;
+        }
+        return false;
+    }
+
+    return true;
+};
+
+const handleCLI = async () => {
+    const args = process.argv.slice(2);
+    
+    if (args.includes('-h') || args.includes('--help')) {
+        console.log(await getHelpText());
         process.exit(0);
     }
 
@@ -1029,11 +1097,19 @@ const run = async () => {
         await applyPendingUpdate(execPath);
         await checkForUpdate(execPath);
     }
-    const isCLI = process.argv.some(arg => ['-r', '-m', '-d', '-a', '-h', '--help'].includes(arg));
+    const args = process.argv.slice(2);
+    if (!isValidArgs(args)) {
+        console.error(await getHelpText());
+        process.exit(1);
+    }
+    const isCLI = args.some(arg => ['-r', '-m', '-d', '-a', '-h', '--help'].includes(arg));
     if (isCLI) {
         await handleCLI();
-    } else {
+    } else if (args.length === 0 || args[0] === 'config') {
         render(<Main />);
+    } else {
+        console.error(await getHelpText());
+        process.exit(1);
     }
 };
 
