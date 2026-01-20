@@ -46,7 +46,6 @@ jobs:
         with:
           name: wisereader-${{ matrix.artifact }}
           path: |
-            ${{ matrix.outfile }}
             ${{ matrix.outfile }}.zip
 
   release:
@@ -60,4 +59,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/wisereader-*
+            dist/*.zip
